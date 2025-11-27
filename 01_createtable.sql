@@ -1,43 +1,112 @@
-----Pedidos com clientes e endereços-----
-SELECT 
-    p.numero_pedido,
-    p.data_pedido,
-    c.nome_fantasia as cliente,
-    c.tipo_estabelecimento,
-    e.logradouro,
-    e.numero,
-    e.bairro,
-    ci.cidade,
-    ci.estado
-FROM pedido p
-INNER JOIN cliente c ON p.CNPJ_cliente = c.CNPJ
-INNER JOIN endereco e ON c.CNPJ = e.CNPJ_cliente
-INNER JOIN cep_info ci ON e.cep = ci.cep
-WHERE e.tipo = 'COMERCIAL';
+-----Tabela Fabricante-----
+CREATE TABLE fabricante (
+    CNPJ TEXT PRIMARY KEY,
+    razao_social TEXT NOT NULL,
+    nome_fantasia TEXT,
+    telefone TEXT,
+    email TEXT,
+    data_cadastro TEXT DEFAULT CURRENT_DATE
+);
 
------Todos os produtos, mesmo os que nunca foram vendidos-----
-SELECT 
-    p.codigo,
-    p.nome,
-    p.categoria,
-    p.quantidade_estoque,
-    COUNT(ip.codigo_produto) as vezes_vendido
-FROM produto p
-LEFT JOIN item_pedido ip ON p.codigo = ip.codigo_produto
-GROUP BY p.codigo, p.nome, p.categoria, p.quantidade_estoque
-ORDER BY vezes_vendido DESC;
+-----Tabela Markup_Categoria-----
+CREATE TABLE markup_categoria (
+    categoria TEXT PRIMARY KEY,
+    markup_percentual REAL NOT NULL CHECK (markup_percentual >= 1.00)
+);
 
------Análise completa de vendas por fabricante-----
-SELECT 
-    f.nome_fantasia as fabricante,
-    p.categoria,
-    COUNT(DISTINCT ip.numero_pedido) as total_pedidos,
-    SUM(ip.quantidade) as total_quantidade_vendida,
-    SUM(ip.quantidade * ip.preco_unitario) as valor_total_vendas,
-    AVG(mc.markup_percentual) as markup_medio
-FROM fabricante f
-INNER JOIN produto p ON f.CNPJ = p.CNPJ_fabricante
-INNER JOIN item_pedido ip ON p.codigo = ip.codigo_produto
-INNER JOIN markup_categoria mc ON p.categoria = mc.categoria
-GROUP BY f.nome_fantasia, p.categoria
-ORDER BY valor_total_vendas DESC;
+-----Tabela Produto-----
+CREATE TABLE produto (
+    codigo TEXT PRIMARY KEY,
+    nome TEXT NOT NULL,
+    descricao TEXT,
+    categoria TEXT,
+    preco_custo REAL CHECK (preco_custo > 0),
+    quantidade_estoque INTEGER DEFAULT 0 CHECK (quantidade_estoque >= 0),
+    estoque_minimo INTEGER DEFAULT 10 CHECK (estoque_minimo >= 0),
+    unidade_medida TEXT,
+    CNPJ_fabricante TEXT NOT NULL,
+    ativo INTEGER DEFAULT 1,
+    FOREIGN KEY (CNPJ_fabricante) REFERENCES fabricante(CNPJ),
+    FOREIGN KEY (categoria) REFERENCES markup_categoria(categoria)
+);
+
+-----Tabela Cliente-----
+CREATE TABLE cliente (
+    CNPJ TEXT PRIMARY KEY,
+    razao_social TEXT NOT NULL,
+    nome_fantasia TEXT,
+    telefone TEXT,
+    email TEXT,
+    tipo_estabelecimento TEXT,
+    data_cadastro TEXT DEFAULT CURRENT_DATE
+);
+
+-----Tabela cep_info-----
+CREATE TABLE cep_info (
+    cep TEXT PRIMARY KEY,
+    logradouro TEXT,
+    bairro TEXT,
+    cidade TEXT NOT NULL,
+    estado TEXT NOT NULL
+);
+
+-----Tabela endereco-----
+CREATE TABLE endereco (
+    id_endereco INTEGER PRIMARY KEY AUTOINCREMENT,
+    CNPJ_cliente TEXT NOT NULL,
+    logradouro TEXT NOT NULL,
+    numero TEXT NOT NULL,
+    complemento TEXT,
+    bairro TEXT,
+    cep TEXT NOT NULL,
+    tipo TEXT,
+    FOREIGN KEY (CNPJ_cliente) REFERENCES cliente(CNPJ),
+    FOREIGN KEY (cep) REFERENCES cep_info(cep)
+);
+
+-----Tabela Pedido-----
+CREATE TABLE pedido (
+    numero_pedido TEXT PRIMARY KEY,
+    data_pedido TEXT NOT NULL,
+    data_entrega_prevista TEXT,
+    status TEXT DEFAULT 'PENDENTE',
+    observacoes TEXT,
+    CNPJ_cliente TEXT NOT NULL,
+    forma_pagamento TEXT,
+    FOREIGN KEY (CNPJ_cliente) REFERENCES cliente(CNPJ)
+);
+
+-----Tabela item_pedido-----
+CREATE TABLE item_pedido (
+    numero_pedido TEXT,
+    codigo_produto TEXT,
+    quantidade INTEGER NOT NULL CHECK (quantidade > 0),
+    preco_unitario REAL NOT NULL CHECK (preco_unitario > 0),
+    desconto REAL DEFAULT 0 CHECK (desconto >= 0),
+    PRIMARY KEY (numero_pedido, codigo_produto),
+    FOREIGN KEY (numero_pedido) REFERENCES pedido(numero_pedido) ON DELETE CASCADE,
+    FOREIGN KEY (codigo_produto) REFERENCES produto(codigo)
+);
+
+-----Tabela fornecedor_logistica-----
+CREATE TABLE fornecedor_logistica (
+    CNPJ TEXT PRIMARY KEY,
+    razao_social TEXT NOT NULL,
+    telefone TEXT,
+    email TEXT,
+    tipo_servico TEXT,
+    avaliacao REAL CHECK (avaliacao BETWEEN 0 AND 5)
+);
+
+-----Tabela Entrega-----
+CREATE TABLE entrega (
+    codigo_rastreio TEXT PRIMARY KEY,
+    data_envio TEXT,
+    data_entrega_real TEXT,
+    status_entrega TEXT DEFAULT 'AGUARDANDO',
+    observacoes TEXT,
+    CNPJ_fornecedor TEXT NOT NULL,
+    numero_pedido TEXT NOT NULL UNIQUE,
+    FOREIGN KEY (CNPJ_fornecedor) REFERENCES fornecedor_logistica(CNPJ),
+    FOREIGN KEY (numero_pedido) REFERENCES pedido(numero_pedido)
+);
