@@ -1,3 +1,5 @@
+BEGIN TRANSACTION;
+
 -----Tabela Fabricante-----
 CREATE TABLE fabricante (
     CNPJ TEXT PRIMARY KEY,
@@ -142,6 +144,13 @@ JOIN cliente c ON p.cnpj_cliente = c.cnpj;
 SELECT nome, quantidade_estoque, estoque_minimo
 FROM produto 
 WHERE quantidade_estoque < estoque_minimo;
+
+-----Remover itens com quantidade zero-----
+DELETE FROM item_pedido 
+WHERE quantidade = 0;
+
+-----Confirmar a remoção-----
+SELECT 'Itens removidos: ' || changes() as resultado;
 
 -----Pedidos com clientes e endereços-----
 SELECT 
